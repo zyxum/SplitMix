@@ -3,7 +3,7 @@ import argparse
 import copy
 
 import numpy as np
-from advertorch.attacks import LinfPGDAttack
+# from advertorch.attacks import LinfPGDAttack
 from torch import nn
 
 from federated.aggregation import ModelAccumulator, SlimmableModelAccumulator

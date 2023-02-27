@@ -4,6 +4,7 @@ import numpy as np
 import operator
 from collections import OrderedDict
 from typing import Union, List, Type
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -269,18 +270,24 @@ class EnsembleNet(BaseModule, SlimmableMixin):
         self._set_slimmabe_ratios(slimmable_ratios)
         self.atom_slim_ratio = atom_slim_ratio
         num_ens = int(max(self.slimmable_ratios) / atom_slim_ratio)
-        self.base_net = base_net
+        if isinstance(base_net, torch.nn.Module):
+            self.base_net = lambda x: deepcopy(base_net)
+        else:
+            self.base_net = base_net
         self.bn_type = bn_type
         for i in range(num_ens):
             # self.add_module(str(i), self.base_net(
             #     num_classes=num_classes, track_running_stats=track_running_stats,
             #     bn_type=bn_type, share_affine=share_affine, #slimmable_layers=slimmable_layers,
             #     width_scale=width_scale*atom_slim_ratio, **kwargs))
-            self.add_module(str(i), self.base_net(num_classes=num_classes))
-        # self.subnets = nn.ModuleList([self.base_net(
-        #     num_classes=num_classes, track_running_stats=track_running_stats,
-        #     bn_type=bn_type, share_affine=share_affine, slimmable_layers=slimmable_layers,
-        #     width_scale=width_scale*atom_slim_ratio) for _ in range(num_ens)])
+            if isinstance(base_net, torch.nn.Module):
+                self.add_module(str(i), self.base_net(None))
+            else:
+                self.add_module(str(i), self.base_net(
+                    num_classes=num_classes, track_running_stats=track_running_stats,
+                    bn_type=bn_type, share_affine=share_affine, #slimmable_layers=slimmable_layers,
+                    width_scale=width_scale*atom_slim_ratio, **kwargs))
+        # self.subnets = nn.ModuleList(deepcopy(self.base_net))
         self.slim_bias_idx = 0
         self.slim_ratio = max(self.slimmable_ratios)
         if width_scale != 1.:

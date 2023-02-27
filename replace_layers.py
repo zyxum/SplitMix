@@ -31,6 +31,7 @@ def get_layer(model: Module, layer_name: str):
     # print(layer_name)
     attributes = layer_name.split('.')
     tmp = model
+    # print(layer_name)
     for attribute in attributes:
         tmp = getattr(tmp, attribute)
     return tmp
@@ -39,7 +40,7 @@ def set_layer(model: Module, layer_name: str, layer: Module):
     attributes = layer_name.split('.')
     tmp = model
     for idx, attribute in enumerate(attributes):
-        if idx == len(attribute) - 1:
+        if idx == len(attributes) - 1:
             break
         tmp = getattr(tmp, attribute)
     setattr(tmp, attributes[-1], layer)

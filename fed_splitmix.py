@@ -93,7 +93,10 @@ def get_model_fh(data, model, atom_slim_ratio):
         elif model in ['customize']:
             from replace_layers import replace
             model = replace("cifar10.pth.tar")
-            return model
+            ModelClass = lambda **kwargs: EnsembleNet(
+                base_net=model, atom_slim_ratio=atom_slim_ratio,
+                rescale_init=args.rescale_init, rescale_layer=args.rescale_layer, **kwargs
+            )
         else:
             raise ValueError(f"Invalid model: {model}")
     else:
@@ -150,7 +153,7 @@ def fed_test(fed, running_model, verbose, adversary=None, val_mix_model=None):
     return val_acc_list, val_loss_mt.avg
 
 if __name__ == '__main__':
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     np.seterr(all='raise')  # make sure warning are raised as exception
 
     parser = argparse.ArgumentParser()
@@ -212,14 +215,12 @@ if __name__ == '__main__':
 
     # Model
     ModelClass = get_model_fh(args.data, args.model, args.atom_slim_ratio)
-    if isinstance(torch.nn.Module, ModelClass):
-        running_model = ModelClass
-    else:
-        running_model = ModelClass(
-            track_running_stats=not args.no_track_stat or (args.test and args.test_refresh_bn), num_classes=fed.num_classes,
-            bn_type='dbn' if 0. < args.adv_lmbd < 1. else 'bn',
-            slimmable_ratios=fed.train_slim_ratios,
-        ).to(device)
+    running_model = ModelClass(
+        track_running_stats=not args.no_track_stat or (args.test and args.test_refresh_bn), num_classes=fed.num_classes,
+        bn_type='dbn' if 0. < args.adv_lmbd < 1. else 'bn',
+        slimmable_ratios=fed.train_slim_ratios,
+    ).to(device)
+    # print(running_model.state_dict().keys())
     # mixed model for validation.
     val_mix_model = running_model if isinstance(running_model, EnsembleNet) \
         else EnsembleSubnet(copy.deepcopy(running_model), args.atom_slim_ratio)

@@ -8,12 +8,12 @@ def make_if_not_exist(p):
 hostname = os.uname()[1]  # type: str
 # Update your paths here.
 CHECKPOINT_ROOT = './checkpoint'
-if int(hostname.split('-')[-1]) >= 8:
-    data_root = '/localscratch2/jyhong/'
-elif hostname.startswith('illidan'):
-    data_root = '/media/Research/jyhong/data'
-else:
-    data_root = './data'
+# if int(hostname.split('-')[-1]) >= 8:
+#     data_root = '/localscratch2/jyhong/'
+# elif hostname.startswith('illidan'):
+#     data_root = '/media/Research/jyhong/data'
+# else:
+data_root = './data'
 make_if_not_exist(data_root)
 make_if_not_exist(CHECKPOINT_ROOT)
 

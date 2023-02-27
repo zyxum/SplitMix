@@ -87,7 +87,7 @@ class CifarDataset(CIFAR10):
     }
     num_classes = 10  # may not be correct
 
-    def __init__(self, domain='cifar10', train=True, transform=None, download=False):
+    def __init__(self, domain='cifar10', train=True, transform=None, download=True):
         assert domain in self.all_domains, f"Invalid domain: {domain}"
         data_path = os.path.join(DATA_PATHS["Cifar10"], domain)
         super().__init__(data_path, train=train, transform=transform, download=download)
