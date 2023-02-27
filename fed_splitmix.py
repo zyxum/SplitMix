@@ -52,6 +52,7 @@ def render_run_name(args, exp_folder):
 
 
 def get_model_fh(data, model, atom_slim_ratio):
+    # TODO support model class here
     # FIXME Only use EnsembleNet or Slimmable model.
     if data == 'Digits':
         if model in ['digit']:
@@ -89,6 +90,10 @@ def get_model_fh(data, model, atom_slim_ratio):
             ModelClass = lambda **kwargs: EnsembleNet(
                 base_net=resnet18, atom_slim_ratio=atom_slim_ratio,
                 rescale_init=args.rescale_init, rescale_layer=args.rescale_layer, **kwargs)
+        elif model in ['customize']:
+            from replace_layers import replace
+            model = replace("cifar10.pth.tar")
+            return model
         else:
             raise ValueError(f"Invalid model: {model}")
     else:
@@ -207,11 +212,14 @@ if __name__ == '__main__':
 
     # Model
     ModelClass = get_model_fh(args.data, args.model, args.atom_slim_ratio)
-    running_model = ModelClass(
-        track_running_stats=not args.no_track_stat or (args.test and args.test_refresh_bn), num_classes=fed.num_classes,
-        bn_type='dbn' if 0. < args.adv_lmbd < 1. else 'bn',
-        slimmable_ratios=fed.train_slim_ratios,
-    ).to(device)
+    if isinstance(torch.nn.Module, ModelClass):
+        running_model = ModelClass
+    else:
+        running_model = ModelClass(
+            track_running_stats=not args.no_track_stat or (args.test and args.test_refresh_bn), num_classes=fed.num_classes,
+            bn_type='dbn' if 0. < args.adv_lmbd < 1. else 'bn',
+            slimmable_ratios=fed.train_slim_ratios,
+        ).to(device)
     # mixed model for validation.
     val_mix_model = running_model if isinstance(running_model, EnsembleNet) \
         else EnsembleSubnet(copy.deepcopy(running_model), args.atom_slim_ratio)

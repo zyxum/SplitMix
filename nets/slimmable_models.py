@@ -80,6 +80,7 @@ class SlimmableMixin(object):
         the set ratio. Check layers defined in `slimmable_ops` for details."""
         # print(f"### switch ratio {ratio}, slim_bias_idx {slim_bias_idx}, "
         #       f"out_slim_bias_idx {out_slim_bias_idx}, mix_forward_num {mix_forward_num}")
+        # TODO: override this function to support out-of-package model support
         if ratio is None:
             return
         for m in list(self.modules()) + [self]:
@@ -271,10 +272,11 @@ class EnsembleNet(BaseModule, SlimmableMixin):
         self.base_net = base_net
         self.bn_type = bn_type
         for i in range(num_ens):
-            self.add_module(str(i), self.base_net(
-                num_classes=num_classes, track_running_stats=track_running_stats,
-                bn_type=bn_type, share_affine=share_affine, #slimmable_layers=slimmable_layers,
-                width_scale=width_scale*atom_slim_ratio, **kwargs))
+            # self.add_module(str(i), self.base_net(
+            #     num_classes=num_classes, track_running_stats=track_running_stats,
+            #     bn_type=bn_type, share_affine=share_affine, #slimmable_layers=slimmable_layers,
+            #     width_scale=width_scale*atom_slim_ratio, **kwargs))
+            self.add_module(str(i), self.base_net(num_classes=num_classes))
         # self.subnets = nn.ModuleList([self.base_net(
         #     num_classes=num_classes, track_running_stats=track_running_stats,
         #     bn_type=bn_type, share_affine=share_affine, slimmable_layers=slimmable_layers,
