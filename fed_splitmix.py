@@ -209,7 +209,11 @@ if __name__ == '__main__':
     # /////////////////////////////////
     fed = Federation(args.data, args)
     # Data
-    train_loaders, val_loaders, test_loaders = fed.get_data()
+    if args.data in ["femnist", "speech"]:
+        from utils.fedscale_dataloader import get_loaders
+        train_loaders, val_loaders, test_loaders = get_loaders(args.data, args)
+    else:
+        train_loaders, val_loaders, test_loaders = fed.get_data()
     mean_batch_iters = int(np.mean([len(tl) for tl in train_loaders]))
     print(f"  mean_batch_iters: {mean_batch_iters}")
 
