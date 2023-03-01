@@ -1,5 +1,4 @@
 from fedscale.dataloaders.divide_data import DataPartitioner, select_dataset
-from fedscale.core.fllibs import init_dataset
 from fedscale.dataloaders.utils_data import get_data_transform
 from argparse import Namespace
 from torchvision import datasets, transforms
@@ -12,11 +11,21 @@ class Customized_Dataloader:
         self.loaders = DataPartitioner(data=dataset, args=args, numOfClass=num_class, isTest=is_test)
         self.loaders.partition_data_helper(num_clients=args.num_clients,
                                            data_map_file=args.data_map_file, )
+        self.internal_mapping = {}
         self._cur_index = 0
-        self._size = len(self.loaders.partitions)
+        self.__preprocess(args.batch_size)
+    
+
+    def __preprocess(self, batch_size):
+        real_index = 0
+        for idx, partition in enumerate(self.loaders.partitions):
+            if len(partition) > batch_size or self.loaders.isTest:
+                self.internal_mapping[idx] = real_index
+                real_index += 1
+        self._size = real_index + 1
 
     def __getitem__(self, item):
-        return select_dataset(item, self.loaders, batch_size=self.args.batch_size, args=self.args)
+        return select_dataset(item, self.loaders, batch_size=self.args.batch_size, args=self.args, isTest=self.loaders.isTest)
 
     def __iter__(self):
         return self
@@ -29,9 +38,12 @@ class Customized_Dataloader:
         self._cur_index = 0
         raise StopIteration
 
+    def __len__(self):
+        return self._size
+
 
 def get_loaders(data_set: str, override_args: Namespace):
-    train_dataset, test_dataset = init_dataset()
+    # train_dataset, test_dataset = init_dataset()
     task = "vision"
     if data_set == "speech":
         task = "speech"
@@ -46,15 +58,15 @@ def get_loaders(data_set: str, override_args: Namespace):
             "data/femnist", dataset='test', transform=test_transform)
 
         args_dict = {"task": task, "batch_size": override_args.batch,
-                     "num_loaders": 1, "num_clients": override_args.pg_nuser,
-                     "data_map_file": "data/femnist/client_data_map/train.csv"}
+                     "num_loaders": 1, "num_clients": override_args.pd_nuser,
+                     "data_map_file": "data/femnist/client_data_mapping/train.csv"}
         args = Namespace(**args_dict)
         train_loaders = Customized_Dataloader(train_dataset, args, 62, False)
 
-        args.data_map_file = "data/femnist/client_data_map/test.csv"
+        args.data_map_file = "data/femnist/client_data_mapping/test.csv"
         test_loaders = Customized_Dataloader(test_dataset, args, 62, True)
 
-        args.data_map_file = "data/femnist/client_data_map/test.csv"
+        args.data_map_file = "data/femnist/client_data_mapping/test.csv"
         val_loaders = Customized_Dataloader(test_dataset, args, 62, True)
 
     elif data_set == "speech":
@@ -95,15 +107,15 @@ def get_loaders(data_set: str, override_args: Namespace):
                                                             valid_feature_transform]))
 
         args_dict = {"task": task, "batch_size": override_args.batch,
-                     "num_loaders": 1, "num_clients": override_args.pg_nuser,
-                     "data_map_file": "data/google_speech/client_data_map/train.csv"}
+                     "num_loaders": 1, "num_clients": override_args.pd_nuser,
+                     "data_map_file": "data/google_speech/client_data_mapping/train.csv"}
         args = Namespace(**args_dict)
         train_loaders = Customized_Dataloader(train_dataset, args, 12, False)
 
-        args.data_map_file = "data/google_speech/client_data_map/test.csv"
+        args.data_map_file = "data/google_speech/client_data_mapping/test.csv"
         test_loaders = Customized_Dataloader(test_dataset, args, 12, True)
 
-        args.data_map_file = "data/google_speech/client_data_map/test.csv"
+        args.data_map_file = "data/google_speech/client_data_mapping/test.csv"
         val_loaders = Customized_Dataloader(test_dataset, args, 12, True)
     else:
         raise Exception(f"dataset {data_set} is not supported")

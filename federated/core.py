@@ -74,20 +74,28 @@ class _Federation:
             from utils.data_loader import prepare_cifar_data
             prepare_data = prepare_cifar_data
             DataClass = CifarDataset
+        elif data in ["femnist", "speech"]:
+            from utils.fedscale_dataloader import get_loaders as prepare_data
         else:
             raise ValueError(f"Unknown dataset: {data}")
-        all_domains = DataClass.resorted_domains[args.domain_order]
+        if data not in ["femnist", "speech"]:
+            all_domains = DataClass.resorted_domains[args.domain_order]
 
-        train_loaders, val_loaders, test_loaders, clients = prepare_data(
-            args, domains=all_domains,
-            n_user_per_domain=args.pd_nuser,
-            n_class_per_user=args.pu_nclass,
-            partition_seed=args.seed + 1,
-            partition_mode=args.partition_mode,
-            val_ratio=args.val_ratio,
-            eq_domain_train_size=args.partition_mode == 'uni',
-            consistent_test_class=args.con_test_cls,
-        )
+            train_loaders, val_loaders, test_loaders, clients = prepare_data(
+                args, domains=all_domains,
+                n_user_per_domain=args.pd_nuser,
+                n_class_per_user=args.pu_nclass,
+                partition_seed=args.seed + 1,
+                partition_mode=args.partition_mode,
+                val_ratio=args.val_ratio,
+                eq_domain_train_size=args.partition_mode == 'uni',
+                consistent_test_class=args.con_test_cls,
+            )
+        else:
+            all_domains = [data]
+            train_loaders, val_loaders, test_loaders = prepare_data(data, self.args)
+            clients = [f"0-{c_id}" for c_id in range(len(train_loaders))]
+            print(f"checking dataloader by fedscale: train: {len(train_loaders)}, test: {len(test_loaders)}")
         clients = [c + ' ' + ('noised' if hasattr(args, 'adv_lmbd') and args.adv_lmbd > 0.
                               else 'clean') for c in clients]
 

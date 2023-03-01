@@ -58,9 +58,19 @@ class SlimmableOpMixin(object):
         raise NotImplementedError()
 
     def _compute_slice_bound(self, in_channels, out_channels, slim_bias_idx, out_slim_bias_idx=None):
-        out_slim_bias_idx = slim_bias_idx if out_slim_bias_idx is None else out_slim_bias_idx
+        out_slim_bias_idx = 0 if out_slim_bias_idx is None else out_slim_bias_idx
         out_idx_bias = out_channels * out_slim_bias_idx if not self.non_slimmable_out else 0
         in_idx_bias = in_channels * slim_bias_idx if not self.non_slimmable_in else 0
+        if isinstance(self, SlimmableConv2d):
+            if out_idx_bias+out_channels > self.max_out_channels:
+                out_idx_bias = 0
+            if in_idx_bias+in_channels > self.max_in_channels:
+                in_idx_bias = 0
+        else:
+            if out_idx_bias+out_channels > self.max_out_features:
+                out_idx_bias = 0
+            if in_idx_bias+in_channels > self.max_in_features:
+                in_idx_bias = 0
         return out_idx_bias, (out_idx_bias+out_channels), in_idx_bias, (in_idx_bias+in_channels)
 
 
@@ -155,6 +165,8 @@ class _SlimmableBatchNorm(_BatchNorm, SlimmableOpMixin):
 
     def _compute_slice_bound(self, channels, slim_bias_idx):
         idx_bias = channels * slim_bias_idx if not self.non_slimmable else 0
+        if idx_bias + channels > self.max_num_features:
+            idx_bias = 0
         return idx_bias, (idx_bias+channels)
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
@@ -238,6 +250,8 @@ class SlimmableConv2d(nn.Conv2d, SlimmableOpMixin):
     def _forward_with_partial_weight(self, x, slim_bias_idx, out_slim_bias_idx=None):
         out_idx0, out_idx1, in_idx0, in_idx1 = self._compute_slice_bound(
             self.in_channels, self.out_channels, slim_bias_idx, out_slim_bias_idx)
+        # print(self.max_in_channels, self.max_out_channels, slim_bias_idx, out_slim_bias_idx)
+        # print(out_idx0, out_idx1, in_idx0, in_idx1)
         weight = self.weight[out_idx0:out_idx1, in_idx0:in_idx1]
         bias = self.bias[out_idx0:out_idx1] if self.bias is not None else None
         y = F.conv2d(

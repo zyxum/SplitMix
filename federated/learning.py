@@ -145,7 +145,6 @@ def train_slimmable(model, data_loader, optimizer, loss_fun, device, adversary=N
                     in sorted(zip(slim_ratios, slim_shifts, out_slim_shifts), reverse=False,
                               key=lambda ss_pair: ss_pair[0]):
                 model.switch_slim_mode(slim_ratio, slim_bias_idx=in_slim_shift, out_slim_bias_idx=out_slim_shift)
-
                 output = model(data)
                 if loss_temp == 'none':
                     _loss = loss_fun(output, target)

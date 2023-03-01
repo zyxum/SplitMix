@@ -17,4 +17,4 @@
 - "--rescale_layer=False"  # NOTE necessary for track bn
 - "--resume"  # use this to fine-tune
 - ${args}
-python fed_splitmix.py --data Cifar10 --model customize --no_track_stat --iters 400 --wk_iters 5 --lr 0.1 --opt sgd --batch 128 --lr_sch multi_step50 --pd_nuser 100 --percent 1.0 --val_ratio 0.1 --val_ens_only 
+python fed_splitmix.py --data femnist --model customize --no_track_stat --iters 400 --wk_iters 5 --lr 0.1 --opt sgd --batch 128 --lr_sch multi_step50 --pd_nuser 100 --percent 1.0 --val_ratio 0.1 --val_ens_only 

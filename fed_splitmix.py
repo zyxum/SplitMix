@@ -99,6 +99,13 @@ def get_model_fh(data, model, atom_slim_ratio):
             )
         else:
             raise ValueError(f"Invalid model: {model}")
+    elif model in ['customize']:
+        from replace_layers import replace
+        model = replace("femnist.pth.tar")
+        ModelClass = lambda **kwargs: EnsembleNet(
+            base_net=model, atom_slim_ratio=atom_slim_ratio,
+            rescale_init=args.rescale_init, rescale_layer=args.rescale_layer, **kwargs
+        )
     else:
         raise ValueError(f"Unknown dataset: {data}")
     return ModelClass
@@ -153,7 +160,7 @@ def fed_test(fed, running_model, verbose, adversary=None, val_mix_model=None):
     return val_acc_list, val_loss_mt.avg
 
 if __name__ == '__main__':
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
     np.seterr(all='raise')  # make sure warning are raised as exception
 
     parser = argparse.ArgumentParser()
