@@ -124,6 +124,7 @@ def train_slimmable(model, data_loader, optimizer, loss_fun, device, adversary=N
     model.train()
     total, correct, loss_all = 0, 0, 0
     max_iter = len(data_loader) if max_iter == np.inf else max_iter
+    # print(max_iter)
     data_iterator = iter(data_loader)
     if adversary is None:
         # ordinary training.
@@ -131,14 +132,24 @@ def train_slimmable(model, data_loader, optimizer, loss_fun, device, adversary=N
         for step in tqdm(range(start_iter, max_iter), file=sys.stdout, disable=not progress):
             # for data, target in tqdm(data_loader, file=sys.stdout):
             try:
-                data, target = next(data_iterator)
-            except StopIteration:
-                data_iterator = iter(data_loader)
-                data, target = next(data_iterator)
+                try:
+                    data, target = next(data_iterator)
+                except StopIteration:
+                    data_iterator = iter(data_loader)
+                    data, target = next(data_iterator)
+            except Exception as e:
+                print(f"training failed as {e}")
+                if total == 0:
+                    loss_all = 0
+                    total = 1 
+                    correct = 0
+                break
+            data = torch.unsqueeze(data, 1).to(device=device)
             optimizer.zero_grad()
 
             data = data.to(device)
             target = target.to(device)
+            # print(target)
 
             loss = 0.
             for slim_ratio, in_slim_shift, out_slim_shift \
@@ -175,6 +186,7 @@ def train_slimmable(model, data_loader, optimizer, loss_fun, device, adversary=N
             optimizer.zero_grad()
 
             # clean data
+            data = torch.unsqueeze(data, 1).to(device=device)
             data = data.to(device)
             target = target.to(device)
 
@@ -187,12 +199,15 @@ def train_slimmable(model, data_loader, optimizer, loss_fun, device, adversary=N
 
                 all_logits, all_targets = [], []
 
+                # print(adv_lmbd)
+
                 if adv_lmbd < 1. or if_use_dbn(model):  # FIXME if dbn, the skip will make a void BNc
                     set_bn_mode(model, False)  # set clean mode
                     logits = model(data)
                     clf_loss_clean = loss_fun(logits, target)
                     all_logits.append(logits)
                     all_targets.append(target)
+                    # print(all_logits, all_targets)
                 else:
                     clf_loss_clean = 0.
 
@@ -300,20 +315,27 @@ def test(model, data_loader, loss_fun, device, adversary=None, progress=False):
     """
     model.eval()
     loss_all, total, correct = 0, 0, 0
-    for data, target in tqdm(data_loader, file=sys.stdout, disable=not progress):
-        data, target = data.to(device), target.to(device)
-        if adversary:
-            with ctx_noparamgrad_and_eval(model):  # make sure BN's are in eval mode
-                data = adversary.perturb(data, target)
+    # for data, target in tqdm(data_loader, file=sys.stdout, disable=not progress):
+    steps = 0
+    while steps < len(data_loader):
+        for data, target in data_loader:
+            data, target = data.to(device), target.to(device)
+            if adversary:
+                with ctx_noparamgrad_and_eval(model):  # make sure BN's are in eval mode
+                    data = adversary.perturb(data, target)
 
-        with torch.no_grad():
-            output = model(data)
-            loss = loss_fun(output, target)
+            with torch.no_grad():
+                if data.shape[0] == 1:
+                    continue
+                data = torch.unsqueeze(data, 1)
+                output = model(data)
+                loss = loss_fun(output, target)
 
-        loss_all += loss.item()
-        total += target.size(0)
-        pred = output.data.max(1)[1]
-        correct += pred.eq(target.view(-1)).sum().item()
+            loss_all += loss.item()
+            total += target.size(0)
+            pred = output.data.max(1)[1]
+            correct += pred.eq(target.view(-1)).sum().item()
+            steps += 1
     return loss_all / len(data_loader), correct/total
 
 

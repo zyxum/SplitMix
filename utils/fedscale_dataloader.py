@@ -20,19 +20,21 @@ class Customized_Dataloader:
         real_index = 0
         for idx, partition in enumerate(self.loaders.partitions):
             if len(partition) > batch_size or self.loaders.isTest:
-                self.internal_mapping[idx] = real_index
+                self.internal_mapping[real_index] = idx
                 real_index += 1
-        self._size = real_index + 1
+        self._size = real_index
 
     def __getitem__(self, item):
-        return select_dataset(item, self.loaders, batch_size=self.args.batch_size, args=self.args, isTest=self.loaders.isTest)
+        item = self.internal_mapping[item]
+        return select_dataset(item+1, self.loaders, batch_size=self.args.batch_size, args=self.args, isTest=self.loaders.isTest)
 
     def __iter__(self):
         return self
 
     def __next__(self):
         if self._cur_index < self._size:
-            member = select_dataset(self._cur_index, self.loaders, batch_size=self.args.batch_size, args=self.args)
+            index = self.internal_mapping[self._cur_index]
+            member = select_dataset(index+1, self.loaders, batch_size=self.args.batch_size, args=self.args, isTest=self.loaders.isTest)
             self._cur_index += 1
             return member
         self._cur_index = 0
@@ -90,18 +92,18 @@ def get_loaders(data_set: str, override_args: Namespace):
             [ChangeAmplitude(), ChangeSpeedAndPitchAudio(), FixAudioLength(), ToSTFT(), StretchAudioOnSTFT(),
              TimeshiftAudioOnSTFT(), FixSTFTDimension()])
         bg_dataset = BackgroundNoiseDataset(
-            os.path.join("data/speech", bkg), data_aug_transform)
+            os.path.join("data/google_speech", bkg), data_aug_transform)
         add_bg_noise = AddBackgroundNoiseOnSTFT(bg_dataset)
         train_feature_transform = transforms.Compose([ToMelSpectrogramFromSTFT(
             n_mels=32), DeleteSTFT(), ToTensor('mel_spectrogram', 'input')])
-        train_dataset = SPEECH("data/speech", dataset='train',
+        train_dataset = SPEECH("data/google_speech", dataset='train',
                                transform=transforms.Compose([LoadAudio(),
                                                              data_aug_transform,
                                                              add_bg_noise,
                                                              train_feature_transform]))
         valid_feature_transform = transforms.Compose(
             [ToMelSpectrogram(n_mels=32), ToTensor('mel_spectrogram', 'input')])
-        test_dataset = SPEECH("data/speech", dataset='test',
+        test_dataset = SPEECH("data/google_speech", dataset='test',
                               transform=transforms.Compose([LoadAudio(),
                                                             FixAudioLength(),
                                                             valid_feature_transform]))
@@ -113,9 +115,13 @@ def get_loaders(data_set: str, override_args: Namespace):
         train_loaders = Customized_Dataloader(train_dataset, args, 12, False)
 
         args.data_map_file = "data/google_speech/client_data_mapping/test.csv"
+        args.batch_size = 1
         test_loaders = Customized_Dataloader(test_dataset, args, 12, True)
+        for test_loader in test_loaders:
+            print(f"test_loader_len: {len(test_loader)}")
 
         args.data_map_file = "data/google_speech/client_data_mapping/test.csv"
+        args.batch_size = 1
         val_loaders = Customized_Dataloader(test_dataset, args, 12, True)
     else:
         raise Exception(f"dataset {data_set} is not supported")

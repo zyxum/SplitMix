@@ -52,7 +52,7 @@ def replace(model_path) -> nn.Module:
     # print("brefore replacing:")
     # print(model)
     # print("###"*100)
-    macs, _ = profile(model, inputs=(torch.randn(10, 3, 28, 28),), verbose=False)
+    macs, _ = profile(model, inputs=(torch.randn(10, 1, 28, 28),), verbose=False)
     print(macs)
     layers, first_layer, last_layer = get_layer_names(model.state_dict())
     for layer_name in layers:

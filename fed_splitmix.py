@@ -101,7 +101,7 @@ def get_model_fh(data, model, atom_slim_ratio):
             raise ValueError(f"Invalid model: {model}")
     elif model in ['customize']:
         from replace_layers import replace
-        model = replace("femnist.pth.tar")
+        model = replace("speech.pth.tar")
         ModelClass = lambda **kwargs: EnsembleNet(
             base_net=model, atom_slim_ratio=atom_slim_ratio,
             rescale_init=args.rescale_init, rescale_layer=args.rescale_layer, **kwargs
@@ -113,7 +113,7 @@ def get_model_fh(data, model, atom_slim_ratio):
 
 def fed_test(fed, running_model, verbose, adversary=None, val_mix_model=None):
     mark = 's' if adversary is None else 'r'
-    val_acc_list = [None for _ in range(fed.client_num)]
+    val_acc_list = [0 for _ in range(fed.client_num)]
     val_loss_mt = AverageMeter()
     slim_val_acc_mt = {slim_ratio: AverageMeter() for slim_ratio in fed.val_slim_ratios}
     for client_idx in range(fed.client_num):
@@ -135,8 +135,11 @@ def fed_test(fed, running_model, verbose, adversary=None, val_mix_model=None):
                 val_loss, val_acc = test_dbn(val_mix_model, val_loaders[client_idx], loss_fun, device,
                                              adversary=adversary, att_BNn=True, detector='gt')
             else:
-                val_loss, val_acc = test(val_mix_model, val_loaders[client_idx], loss_fun, device,
-                                         adversary=adversary)
+                try:
+                    val_loss, val_acc = test(val_mix_model, val_loaders[client_idx], loss_fun, device,
+                                            adversary=adversary)
+                except ZeroDivisionError:
+                    continue
 
             # Log
             val_loss_mt.append(val_loss)
@@ -325,6 +328,8 @@ if __name__ == '__main__':
             print(f"### current slice: {running_model.current_slice()}")
         test_acc_mt = AverageMeter()
         for test_idx, test_loader in enumerate(test_loaders):
+            if len(test_loader) == 0:
+                continue
             fed.download(running_model, test_idx, strict=not args.test_refresh_bn)
             if running_model.bn_type.startswith('d'):
                 _, test_acc = test_dbn(test_model, test_loader, loss_fun, device,
@@ -411,6 +416,8 @@ if __name__ == '__main__':
                 raise ValueError(f"Invalid optimizer: {args.opt}")
             local_iters = mean_batch_iters * args.wk_iters if args.partition_mode != 'uni' \
                 else len(train_loaders[client_idx]) * args.wk_iters
+            # print(f"local iters: {local_iters}, length of loader: {len(train_loaders[client_idx])}")
+            # try:
             train_loss, train_acc = train_slimmable(
                 running_model, train_loaders[client_idx], optimizer, loss_fun, device,
                 max_iter=local_iters,
@@ -418,6 +425,8 @@ if __name__ == '__main__':
                 loss_temp=args.loss_temp,
                 adversary=adversary, adv_lmbd=args.adv_lmbd, att_BNn=True,
             )
+            # except Exception as e:
+            #     continue
 
             # Upload
             fed.upload(running_model, client_idx,
@@ -442,7 +451,8 @@ if __name__ == '__main__':
         # Use accumulated model to update server model
         fed.aggregate()
 
-
+        if a_iter % 10 != 0:
+            continue
         # ----------- Validation ---------------
         val_acc_list, val_loss = fed_test(
             fed, running_model, args.verbose, val_mix_model=val_mix_model, adversary=None)
